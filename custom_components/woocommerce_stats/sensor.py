@@ -1,98 +1,63 @@
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_ATTRIBUTION
 from homeassistant.core import HomeAssistant
-from datetime import timedelta
-from woocommerce import API
-import voluptuous as vol
-import homeassistant.helpers.config_validation as cv
-import logging
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-_LOGGER = logging.getLogger(__name__)
+from .const import DOMAIN, COORDINATOR, SENSORS, ATTRIBUTION
 
-DOMAIN = "woocommerce_stats"
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up WooCommerce Stats sensors from a config entry."""
+    data = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = data[COORDINATOR]
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Optional("url", default=""): cv.string,
-        vol.Optional("consumer_key", default=""): cv.string,
-        vol.Optional("consumer_secret", default=""): cv.string,
-    }
-)
-
-
-MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=10)
-
-
-class WooCommerceData:
-    """Class to manage fetching data from WooCommerce API."""
-
-    def __init__(self, url, consumer_key, consumer_secret):
-        self.api = API(
-            url=url,
-            consumer_key=consumer_key,
-            consumer_secret=consumer_secret,
-            version="wc/v3"
+    entities = []
+    for description in SENSORS:
+        entities.append(
+            WooCommerceStatsEntity(
+                description=description,
+                coordinator=coordinator,
+                config_entry=config_entry,
+            )
         )
-        self.data = {}
 
-    @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    async def async_update(self):
-        """Fetch data from WooCommerce API."""
-        _LOGGER.debug("Fetching data from WooCommerce API...")
-        try:
-            response = await self.api.get_async("reports/totals")
-            self.data = response.json()
-            _LOGGER.debug("WooCommerce data fetched: %s", self.data)
-        except Exception as e:
-            _LOGGER.error("Error fetching data from WooCommerce: %s", e)
-            self.data = {}
+    async_add_entities(entities)
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Set up WooCommerce sensors."""
-    url = config_entry.data["url"]
-    consumer_key = config_entry.data["consumer_key"]
-    consumer_secret = config_entry.data["consumer_secret"]
+class WooCommerceStatsEntity(CoordinatorEntity, SensorEntity):
+    """Representation of a WooCommerce Stats sensor."""
 
-    wc_data = WooCommerceData(url, consumer_key, consumer_secret)
-    await wc_data.async_update()
-
-    async_add_entities([
-        WooCommerceSensor(wc_data, "Total Sales", "total_sales"),
-        WooCommerceSensor(wc_data, "Total Orders", "total_orders"),
-    ])
-
-
-class WooCommerceSensor(SensorEntity):
-    """Representation of a WooCommerce sensor."""
-
-    def __init__(self, data, name, key):
-        self.data = data
-        self._name = name
-        self._key = key
-
-    async def async_update(self):
-        """Fetch the latest data from WooCommerce."""
-        await self.data.async_update()
+    def __init__(self, description, coordinator, config_entry):
+        """Initialize the WooCommerce Stats sensor."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._config_entry = config_entry
+        self._attr_unique_id = f"{DOMAIN}_{description.key}_{config_entry.entry_id}"
 
     @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the current state of the sensor."""
-        return self.data.data.get(self._key, 0)
+    def native_value(self):
+        """Return the state of the sensor."""
+        return self.coordinator.data.get(self.entity_description.key)
 
     @property
     def extra_state_attributes(self):
-        """Return additional attributes."""
-        return {"last_update": self.data.data}
+        """Return extra attributes for the sensor."""
+        return {
+            ATTR_ATTRIBUTION: ATTRIBUTION,
+            "last_updated": self.coordinator.last_update_success,
+        }
 
     @property
-    def unique_id(self):
-        """Return a unique ID for this sensor."""
-        return f"woocommerce_stats_{self._key}"
+    def device_info(self):
+        """Return device info for the sensor."""
+        return {
+            "identifiers": {(DOMAIN, self._config_entry.entry_id)},
+            "name": "WooCommerce Stats",
+            "manufacturer": "WooCommerce",
+            "model": "API Integration",
+        }
