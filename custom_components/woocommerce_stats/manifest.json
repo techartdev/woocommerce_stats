@@ -7,5 +7,6 @@
   "codeowners": ["@techartdev"],
   "requirements": ["woocommerce==3.0.0"],
   "dependencies": [],
-  "iot_class": "cloud_polling"
+  "iot_class": "cloud_polling",
+  "config_flow": true
 }
