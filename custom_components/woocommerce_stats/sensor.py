@@ -7,48 +7,39 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, COORDINATOR, SENSORS, ATTRIBUTION
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Set up WooCommerce Stats sensors from a config entry."""
-    data = hass.data[DOMAIN][config_entry.entry_id]
-    coordinator = data[COORDINATOR]
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    """Set up WooCommerce Stats sensors."""
+    coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
 
-    entities = []
-    for description in SENSORS:
-        entities.append(
-            WooCommerceStatsEntity(
-                description=description,
-                coordinator=coordinator,
-                config_entry=config_entry,
-            )
-        )
-
-    async_add_entities(entities)
-
+    # Create sensor entities based on the SENSORS definition
+    async_add_entities([
+        WooCommerceStatsEntity(coordinator, sensor_description, entry)
+        for sensor_description in SENSORS
+    ])
 
 class WooCommerceStatsEntity(CoordinatorEntity, SensorEntity):
     """Representation of a WooCommerce Stats sensor."""
 
-    def __init__(self, description, coordinator, config_entry):
-        """Initialize the WooCommerce Stats sensor."""
+    def __init__(self, coordinator, description: dict, config_entry: ConfigEntry):
+        """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._config_entry = config_entry
-        self._attr_unique_id = f"{DOMAIN}_{description.key}_{config_entry.entry_id}"
+        self._attr_name = description["name"]
+        self._attr_icon = description.get("icon")
+        self._attr_native_unit_of_measurement = description.get("unit")
+        self._attr_unique_id = f"{DOMAIN}_{description['key']}_{config_entry.entry_id}"
+        self._description_key = description["key"]
 
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        return self.coordinator.data.get(self.entity_description.key)
+        return self.coordinator.data.get(self._description_key)
 
     @property
     def extra_state_attributes(self):
-        """Return extra attributes for the sensor."""
+        """Return additional attributes for the sensor."""
         return {
-            ATTR_ATTRIBUTION: ATTRIBUTION,
+            "attribution": ATTRIBUTION,
             "last_updated": self.coordinator.last_update_success,
         }
 
