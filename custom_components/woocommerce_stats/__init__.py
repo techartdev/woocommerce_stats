@@ -41,19 +41,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                             "Failed to fetch data from WooCommerce API. HTTP Status: %s",
                             response.status,
                         )
-                        raise UpdateFailed(f"Failed to fetch data. HTTP Status: {response.status}")
-                    
+                        raise UpdateFailed(f"HTTP Error: {response.status}")
+
                     # Parse JSON response
-                    result = await response.json()
-                    _LOGGER.debug("WooCommerce API response: %s", result)
-                    
+                    result = await response.json(content_type=None)  # Avoid content type enforcement
+                    if not isinstance(result, list) or not result:
+                        _LOGGER.error("Unexpected response format: %s", result)
+                        raise UpdateFailed("Unexpected response format from WooCommerce API.")
+
+                    # Extract the first element of the list
+                    data = result[0]
+                    _LOGGER.debug("WooCommerce API parsed response: %s", data)
+
                     # Save to persistent storage
-                    await store.async_save(result)
-                    
-                    return result
+                    await store.async_save(data)
+
+                    return data
             except aiohttp.ClientError as e:
                 _LOGGER.error("Error communicating with WooCommerce API: %s", e)
                 raise UpdateFailed(f"Error communicating with WooCommerce API: {e}") from e
+            except ValueError as e:
+                _LOGGER.error("Invalid JSON response from WooCommerce API: %s", e)
+                raise UpdateFailed("Invalid JSON response from WooCommerce API.") from e
+
 
     # Data update coordinator for periodic fetching
     coordinator = DataUpdateCoordinator(

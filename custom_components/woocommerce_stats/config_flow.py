@@ -31,14 +31,22 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
                     raise CannotConnect(
                         f"Failed to connect to WooCommerce API. HTTP Status: {response.status}"
                     )
-                result = await response.json()
-                if not isinstance(result, dict):
+
+                # Parse JSON response
+                result = await response.json(content_type=None)
+                if not isinstance(result, list) or not result:
+                    _LOGGER.error("Unexpected response format: %s", result)
                     raise CannotConnect("Unexpected response format from WooCommerce API.")
+
+                # Extract the first element
+                data = result[0]
+
         except aiohttp.ClientError as err:
             _LOGGER.error("Error communicating with WooCommerce API: %s", err)
             raise CannotConnect(f"Error communicating with WooCommerce API: {err}") from err
 
-    return {"store_name": "WooCommerce Store"}
+    return {"store_name": data.get("store_name", "WooCommerce Store")}
+
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
