@@ -3,7 +3,7 @@ import voluptuous as vol
 import logging
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Config, HomeAssistant
+from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,16 +41,14 @@ async def async_setup(hass, config):
     return True
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
-    """Set up woocommerce_stats as config entry."""
+    """Set up WooCommerce Stats from a config entry."""
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
     )
     return True
 
-
-async def async_remove_entry(hass, config_entry):
-    try:
-        await hass.config_entries.async_forward_entry_unload(config_entry, "sensor")
-        _LOGGER.info("Successfully removed sensor from the woocommerce_stats integration")
-    except ValueError:
-        pass
+async def async_unload_entry(hass, config_entry):
+    """Unload a config entry."""
+    _LOGGER.debug("async_unload_entry called for WooCommerce Stats.")
+    await hass.config_entries.async_forward_entry_unload(config_entry, "sensor")
+    return True
