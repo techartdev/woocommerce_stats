@@ -1,0 +1,8 @@
+{
+    "name": "WooCommerce Stats",
+    "content_in_root": false,
+    "domains": ["woocommerce_stats"],
+    "homeassistant": "2023.11.0",
+    "render_readme": true
+  }
+  

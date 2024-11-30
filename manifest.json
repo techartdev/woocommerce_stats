@@ -1,0 +1,8 @@
+{
+    "domain": "woocommerce_stats",
+    "name": "WooCommerce Stats",
+    "documentation": "https://github.com/techartdev/woocommerce_stats",
+    "dependencies": [],
+    "codeowners": ["@techartdev"],
+    "requirements": ["woocommerce==3.0.0"]
+  }
