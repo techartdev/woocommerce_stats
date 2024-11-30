@@ -23,12 +23,11 @@ async def async_setup_entry(
 class WooCommerceStatsEntity(CoordinatorEntity, SensorEntity):
     """Representation of a WooCommerce Stats sensor."""
 
-    def __init__(
-        self, coordinator, description: SensorEntityDescription, config_entry: ConfigEntry
-    ):
+    def __init__(self, coordinator, description: SensorEntityDescription, config_entry: ConfigEntry):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
+        self._config_entry = config_entry  # Store the config entry as an instance attribute
         self._attr_unique_id = f"{DOMAIN}_{description.key}_{config_entry.entry_id}"
 
     @property
@@ -46,10 +45,10 @@ class WooCommerceStatsEntity(CoordinatorEntity, SensorEntity):
 
     @property
     def device_info(self):
-        """Return device info for the sensor."""
+        """Return device information."""
         return {
             "identifiers": {(DOMAIN, self._config_entry.entry_id)},
             "name": "WooCommerce Stats",
             "manufacturer": "WooCommerce",
-            "model": "API Integration",
+            "model": "WooCommerce API",
         }
