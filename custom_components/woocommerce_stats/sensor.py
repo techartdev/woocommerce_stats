@@ -4,69 +4,78 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from datetime import timedelta
 from woocommerce import API
+import voluptuous as vol
+import homeassistant.helpers.config_validation as cv
 import logging
+from homeassistant.components.sensor import PLATFORM_SCHEMA
 
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "woocommerce_stats"
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
-    """Set up WooCommerce Stats sensors via a config entry."""
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+    {
+        vol.Optional("url", default=""): cv.string,
+        vol.Optional("consumer_key", default=""): cv.string,
+        vol.Optional("consumer_secret", default=""): cv.string,
+    }
+)
+
+
+MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=10)
+
+
+class WooCommerceData:
+    """Class to manage fetching data from WooCommerce API."""
+
+    def __init__(self, url, consumer_key, consumer_secret):
+        self.api = API(
+            url=url,
+            consumer_key=consumer_key,
+            consumer_secret=consumer_secret,
+            version="wc/v3"
+        )
+        self.data = {}
+
+    @Throttle(MIN_TIME_BETWEEN_UPDATES)
+    async def async_update(self):
+        """Fetch data from WooCommerce API."""
+        _LOGGER.debug("Fetching data from WooCommerce API...")
+        try:
+            response = await self.api.get_async("reports/totals")
+            self.data = response.json()
+            _LOGGER.debug("WooCommerce data fetched: %s", self.data)
+        except Exception as e:
+            _LOGGER.error("Error fetching data from WooCommerce: %s", e)
+            self.data = {}
+
+
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    """Set up WooCommerce sensors."""
     url = config_entry.data["url"]
     consumer_key = config_entry.data["consumer_key"]
     consumer_secret = config_entry.data["consumer_secret"]
 
-    _LOGGER.debug("Setting up WooCommerce Stats sensors...")
+    wc_data = WooCommerceData(url, consumer_key, consumer_secret)
+    await wc_data.async_update()
 
-    wc_api = API(
-        url=url,
-        consumer_key=consumer_key,
-        consumer_secret=consumer_secret,
-        version="wc/v3"
-    )
-
-    async def fetch_data():
-        try:
-            _LOGGER.debug("Fetching data from WooCommerce API...")
-            response = wc_api.get("reports/totals").json()
-            _LOGGER.debug("WooCommerce API Response: %s", response)
-            return {
-                "total_sales": response.get("sales", 0),
-                "total_orders": response.get("orders", 0),
-                "total_customers": response.get("customers", 0),
-            }
-        except Exception as err:
-            _LOGGER.error("Error fetching data from WooCommerce: %s", err)
-            raise UpdateFailed(err)
-
-    coordinator = DataUpdateCoordinator(
-        hass,
-        _LOGGER,
-        name="woocommerce_stats",
-        update_method=fetch_data,
-        update_interval=timedelta(minutes=10),
-    )
-
-    _LOGGER.debug("Refreshing data for the first time...")
-    await coordinator.async_refresh()
-
-    _LOGGER.debug("Adding sensors to Home Assistant...")
     async_add_entities([
-        WooCommerceSensor(coordinator, "Total Sales", "total_sales"),
-        WooCommerceSensor(coordinator, "Total Orders", "total_orders"),
-        WooCommerceSensor(coordinator, "Total Customers", "total_customers"),
+        WooCommerceSensor(wc_data, "Total Sales", "total_sales"),
+        WooCommerceSensor(wc_data, "Total Orders", "total_orders"),
     ])
-    _LOGGER.debug("Sensors have been added successfully.")
 
 
 class WooCommerceSensor(SensorEntity):
     """Representation of a WooCommerce sensor."""
 
-    def __init__(self, coordinator, name, key):
-        """Initialize the sensor."""
-        self.coordinator = coordinator
+    def __init__(self, data, name, key):
+        self.data = data
         self._name = name
         self._key = key
+
+    async def async_update(self):
+        """Fetch the latest data from WooCommerce."""
+        await self.data.async_update()
 
     @property
     def name(self):
@@ -75,32 +84,15 @@ class WooCommerceSensor(SensorEntity):
 
     @property
     def state(self):
-        """Return the state of the sensor."""
-        return self.coordinator.data.get(self._key)
-
-    @property
-    def should_poll(self):
-        """No polling needed, coordinator handles updates."""
-        return False
-
-    @property
-    def available(self):
-        """Return True if data is available."""
-        return self.coordinator.last_update_success
+        """Return the current state of the sensor."""
+        return self.data.data.get(self._key, 0)
 
     @property
     def extra_state_attributes(self):
-        """Return the state attributes."""
-        return {
-            "data_fetched": self.coordinator.data
-        }
+        """Return additional attributes."""
+        return {"last_update": self.data.data}
 
-    async def async_update(self):
-        """Manually trigger an update."""
-        await self.coordinator.async_request_refresh()
-
-    async def async_added_to_hass(self):
-        """Subscribe to coordinator updates."""
-        self.async_on_remove(
-            self.coordinator.async_add_listener(self.async_write_ha_state)
-        )
+    @property
+    def unique_id(self):
+        """Return a unique ID for this sensor."""
+        return f"woocommerce_stats_{self._key}"

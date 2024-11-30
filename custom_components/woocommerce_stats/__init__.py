@@ -1,6 +1,7 @@
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
+from homeassistant import config_entries
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -10,8 +11,21 @@ DOMAIN = "woocommerce_stats"
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up WooCommerce Stats integration using YAML (deprecated in modern HA)."""
-    _LOGGER.debug("async_setup called for WooCommerce Stats.")
-    # If using YAML configuration, initialize it here (not recommended anymore)
+    if config.get(DOMAIN) is None:
+        # We get her if the integration is set up using config flow
+        return True
+
+    try:
+        await hass.config_entries.async_forward_entry_setup(config, "sensor")
+        _LOGGER.info("Successfully added sensor from the avfallsor integration")
+    except ValueError:
+        pass
+
+    hass.async_create_task(
+        hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_IMPORT}, data={}
+        )
+    )
     return True
 
 
