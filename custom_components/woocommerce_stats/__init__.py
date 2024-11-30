@@ -35,7 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async with async_timeout.timeout(30):
             try:
                 # Fetch data from the WooCommerce API
-                response = wc_api.get("reports/totals").json()
+                response = wc_api.get("reports/sales").json()
                 _LOGGER.debug("WooCommerce API response: %s", response)
                 await store.async_save(response)  # Save response to persistent storage
                 return response

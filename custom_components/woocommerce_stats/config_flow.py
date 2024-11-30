@@ -26,7 +26,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     try:
         # Attempt to fetch basic data from the API
-        response = wc_api.get("reports/totals").json()
+        response = wc_api.get("reports/sales").json()
 
         # Check if the response is valid
         if not isinstance(response, dict):
