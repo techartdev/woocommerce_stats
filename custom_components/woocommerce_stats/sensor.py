@@ -12,12 +12,12 @@ DOMAIN = "woocommerce_stats"
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
     """Set up WooCommerce Stats sensors via a config entry."""
-    # Get API details from the config entry
     url = config_entry.data["url"]
     consumer_key = config_entry.data["consumer_key"]
     consumer_secret = config_entry.data["consumer_secret"]
 
-    # Initialize WooCommerce API
+    _LOGGER.debug("Setting up WooCommerce Stats sensors...")
+
     wc_api = API(
         url=url,
         consumer_key=consumer_key,
@@ -25,11 +25,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
         version="wc/v3"
     )
 
-    # Data Update Coordinator for fetching data
     async def fetch_data():
         try:
             _LOGGER.debug("Fetching data from WooCommerce API...")
             response = wc_api.get("reports/totals").json()
+            _LOGGER.debug("WooCommerce API Response: %s", response)
             return {
                 "total_sales": response.get("sales", 0),
                 "total_orders": response.get("orders", 0),
@@ -47,15 +47,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
         update_interval=timedelta(minutes=10),
     )
 
-    # Refresh coordinator data
+    _LOGGER.debug("Refreshing data for the first time...")
     await coordinator.async_refresh()
 
-    # Create sensor entities
+    _LOGGER.debug("Adding sensors to Home Assistant...")
     async_add_entities([
         WooCommerceSensor(coordinator, "Total Sales", "total_sales"),
         WooCommerceSensor(coordinator, "Total Orders", "total_orders"),
         WooCommerceSensor(coordinator, "Total Customers", "total_customers"),
     ])
+    _LOGGER.debug("Sensors have been added successfully.")
+
 
 class WooCommerceSensor(SensorEntity):
     """Representation of a WooCommerce sensor."""
