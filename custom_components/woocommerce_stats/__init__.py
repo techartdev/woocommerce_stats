@@ -8,7 +8,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
 
-from woocommerce import API
+import aiohttp
 from .const import DOMAIN, PLATFORMS, DEFAULT_SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,26 +22,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Persistent storage for tokens or data
     store = Store(hass, STORAGE_VERSION, f"woocommerce_{entry.entry_id}")
 
-    # Initialize WooCommerce API
-    wc_api = API(
-        url=config["url"],
-        consumer_key=config["consumer_key"],
-        consumer_secret=config["consumer_secret"],
-        version="wc/v3"
-    )
+    # Asynchronous HTTP client session
+    session = aiohttp.ClientSession()
 
     async def async_update_data():
         """Fetch data from WooCommerce API."""
+        url = f"{config['url']}/wp-json/wc/v3/reports/sales"
+        auth = aiohttp.BasicAuth(config["consumer_key"], config["consumer_secret"])
+
         async with async_timeout.timeout(30):
             try:
-                # Fetch data from the WooCommerce API
-                response = wc_api.get("reports/sales").json()
-                _LOGGER.debug("WooCommerce API response: %s", response)
-                await store.async_save(response)  # Save response to persistent storage
-                return response
-            except Exception as e:
-                _LOGGER.error("Error fetching data from WooCommerce: %s", e)
-                raise UpdateFailed(f"Error communicating with WooCommerce: {e}")
+                async with session.get(url, auth=auth) as response:
+                    if response.status == 401:
+                        _LOGGER.error("Invalid WooCommerce API credentials.")
+                        raise UpdateFailed("Invalid API credentials.")
+                    if response.status != 200:
+                        _LOGGER.error(
+                            "Failed to fetch data from WooCommerce API. HTTP Status: %s",
+                            response.status,
+                        )
+                        raise UpdateFailed(f"Failed to fetch data. HTTP Status: {response.status}")
+                    
+                    # Parse JSON response
+                    result = await response.json()
+                    _LOGGER.debug("WooCommerce API response: %s", result)
+                    
+                    # Save to persistent storage
+                    await store.async_save(result)
+                    
+                    return result
+            except aiohttp.ClientError as e:
+                _LOGGER.error("Error communicating with WooCommerce API: %s", e)
+                raise UpdateFailed(f"Error communicating with WooCommerce API: {e}") from e
 
     # Data update coordinator for periodic fetching
     coordinator = DataUpdateCoordinator(
@@ -58,7 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Store the coordinator in the Home Assistant data object
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "coordinator": coordinator,
-        "api": wc_api,
+        "session": session,  # Store aiohttp session for cleanup
         "store": store,
     }
 
@@ -69,7 +81,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a WooCommerce Stats config entry."""
+    # Retrieve stored session
+    session = hass.data[DOMAIN][entry.entry_id]["session"]
+
+    # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
     if unload_ok:
+        # Close the aiohttp session
+        await session.close()
+
+        # Clean up stored data
         hass.data[DOMAIN].pop(entry.entry_id)
+
     return unload_ok

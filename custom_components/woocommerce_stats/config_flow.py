@@ -2,7 +2,8 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from woocommerce import API
+import aiohttp
+import asyncio
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -14,39 +15,29 @@ _LOGGER = logging.getLogger(__name__)
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect to WooCommerce."""
-    from woocommerce import API
+    url = f"{data['url']}/wp-json/wc/v3/reports/sales"
+    auth = aiohttp.BasicAuth(data["consumer_key"], data["consumer_secret"])
 
-    # Initialize the WooCommerce API client
-    wc_api = API(
-        url=data["url"],
-        consumer_key=data["consumer_key"],
-        consumer_secret=data["consumer_secret"],
-        version="wc/v3"
-    )
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, auth=auth) as response:
+                if response.status == 401:
+                    _LOGGER.error("Invalid WooCommerce API credentials.")
+                    raise InvalidAuth("Invalid WooCommerce API credentials.")
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Failed to connect to WooCommerce API. HTTP Status: %s", response.status
+                    )
+                    raise CannotConnect(
+                        f"Failed to connect to WooCommerce API. HTTP Status: {response.status}"
+                    )
+                result = await response.json()
+                if not isinstance(result, dict):
+                    raise CannotConnect("Unexpected response format from WooCommerce API.")
+        except aiohttp.ClientError as err:
+            _LOGGER.error("Error communicating with WooCommerce API: %s", err)
+            raise CannotConnect(f"Error communicating with WooCommerce API: {err}") from err
 
-    try:
-        # Attempt to fetch basic data from the API
-        response = wc_api.get("reports/sales").json()
-
-        # Check if the response is valid
-        if not isinstance(response, dict):
-            _LOGGER.error("Invalid response format: %s", response)
-            raise CannotConnect("Invalid response format from WooCommerce API.")
-
-        # Check for specific error codes or missing fields
-        if "sales" not in response or "orders" not in response:
-            _LOGGER.error("Expected fields missing in response: %s", response)
-            raise CannotConnect("Unexpected response format from WooCommerce API.")
-
-    except CannotConnect as err:
-        # Re-raise custom errors
-        raise err
-    except Exception as err:
-        # Log and raise unexpected errors
-        _LOGGER.exception("Unexpected error during WooCommerce API validation: %s", err)
-        raise CannotConnect("An unexpected error occurred.") from err
-
-    # Return validated data (e.g., store name) for creating the config entry
     return {"store_name": "WooCommerce Store"}
 
 

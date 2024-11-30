@@ -5,7 +5,7 @@
   "documentation": "https://github.com/techartdev/woocommerce_stats",
   "issue_tracker": "https://github.com/techartdev/woocommerce_stats/issues",
   "codeowners": ["@techartdev"],
-  "requirements": ["woocommerce==3.0.0"],
+  "requirements": ["aiohttp"],
   "dependencies": [],
   "config_flow": true
 }
