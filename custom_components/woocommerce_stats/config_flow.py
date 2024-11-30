@@ -14,20 +14,39 @@ _LOGGER = logging.getLogger(__name__)
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect to WooCommerce."""
+    from woocommerce import API
+
+    # Initialize the WooCommerce API client
     wc_api = API(
         url=data["url"],
         consumer_key=data["consumer_key"],
         consumer_secret=data["consumer_secret"],
         version="wc/v3"
     )
-    try:
-        response = wc_api.get("reports/totals").json()
-        if not isinstance(response, dict):
-            raise CannotConnect
-    except Exception as err:
-        raise CannotConnect from err
 
-    # Return validated data (e.g., store name) for the entry
+    try:
+        # Attempt to fetch basic data from the API
+        response = wc_api.get("reports/totals").json()
+
+        # Check if the response is valid
+        if not isinstance(response, dict):
+            _LOGGER.error("Invalid response format: %s", response)
+            raise CannotConnect("Invalid response format from WooCommerce API.")
+
+        # Check for specific error codes or missing fields
+        if "sales" not in response or "orders" not in response:
+            _LOGGER.error("Expected fields missing in response: %s", response)
+            raise CannotConnect("Unexpected response format from WooCommerce API.")
+
+    except CannotConnect as err:
+        # Re-raise custom errors
+        raise err
+    except Exception as err:
+        # Log and raise unexpected errors
+        _LOGGER.exception("Unexpected error during WooCommerce API validation: %s", err)
+        raise CannotConnect("An unexpected error occurred.") from err
+
+    # Return validated data (e.g., store name) for creating the config entry
     return {"store_name": "WooCommerce Store"}
 
 
@@ -47,27 +66,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 validated_data = await validate_input(self.hass, user_input)
-            except CannotConnect:
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except CannotConnect as err:
+                _LOGGER.error("Connection failed: %s", err)
                 errors["base"] = "cannot_connect"
             except Exception as err:
-                _LOGGER.exception("Unexpected exception during validation: %s", err)
+                _LOGGER.exception("Unexpected error during validation: %s", err)
                 errors["base"] = "unknown"
             else:
-                # If re-auth, update the existing entry
-                if self._reauth_entry:
-                    self.hass.config_entries.async_update_entry(
-                        self._reauth_entry, data=user_input
-                    )
-                    return self.async_abort(reason="reauth_successful")
-
-                # Create a new config entry
                 return self.async_create_entry(
-                    title=validated_data["store_name"], data=user_input
+                    title=validated_data["store_name"],
+                    data=user_input
                 )
 
         # Input form schema
         schema = vol.Schema({
-            vol.Required("url", default="https://your-store.com"): str,
+            vol.Required("url", default="https://yourstore.com"): str,
             vol.Required("consumer_key"): str,
             vol.Required("consumer_secret"): str,
         })
@@ -75,6 +90,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=schema, errors=errors
         )
+    
 
     async def async_step_reauth(self, user_input: dict[str, Any] = None) -> config_entries.FlowResult:
         """Handle re-authentication."""
@@ -114,3 +130,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect to WooCommerce."""
+
+    def __init__(self, message="Cannot connect to WooCommerce API."):
+        super().__init__(message)
+
+
+class InvalidAuth(HomeAssistantError):
+    """Error to indicate invalid authentication."""

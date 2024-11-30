@@ -1,0 +1,19 @@
+{
+    "config": {
+      "step": {
+        "user": {
+          "data": {
+            "url": "Store URL",
+            "consumer_key": "Consumer Key",
+            "consumer_secret": "Consumer Secret"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Unable to connect to the WooCommerce API. Check your URL and internet connection.",
+        "invalid_auth": "Invalid API credentials. Please verify your consumer key and secret.",
+        "unknown": "An unexpected error occurred. Check the logs for details."
+      }
+    }
+  }
+  
