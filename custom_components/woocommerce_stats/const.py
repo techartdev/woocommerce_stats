@@ -24,7 +24,7 @@ SENSORS = [
         icon="mdi:currency-usd",
         native_unit_of_measurement="USD",
     ),
-        SensorEntityDescription(
+    SensorEntityDescription(
         key="net_sales",
         name="Net Sales",
         icon="mdi:currency-usd",
