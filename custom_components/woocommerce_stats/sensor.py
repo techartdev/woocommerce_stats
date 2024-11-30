@@ -4,10 +4,13 @@ from homeassistant.const import ATTR_ATTRIBUTION
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.components.sensor import SensorEntityDescription
 
 from .const import DOMAIN, COORDINATOR, SENSORS, ATTRIBUTION
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
     """Set up WooCommerce Stats sensors."""
     coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
 
@@ -20,20 +23,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class WooCommerceStatsEntity(CoordinatorEntity, SensorEntity):
     """Representation of a WooCommerce Stats sensor."""
 
-    def __init__(self, coordinator, description: dict, config_entry: ConfigEntry):
+    def __init__(
+        self, coordinator, description: SensorEntityDescription, config_entry: ConfigEntry
+    ):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_name = description["name"]
-        self._attr_icon = description.get("icon")
-        self._attr_native_unit_of_measurement = description.get("unit")
-        self._attr_unique_id = f"{DOMAIN}_{description['key']}_{config_entry.entry_id}"
-        self._description_key = description["key"]
+        self._attr_unique_id = f"{DOMAIN}_{description.key}_{config_entry.entry_id}"
 
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        return self.coordinator.data.get(self._description_key)
+        return self.coordinator.data.get(self.entity_description.key)
 
     @property
     def extra_state_attributes(self):
