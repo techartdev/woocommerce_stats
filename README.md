@@ -42,12 +42,18 @@ A custom Home Assistant integration that uses the WooCommerce API to fetch and d
 
 ## Available Sensors
 The following sensors will be created automatically after setup:
-- `sensor.total_sales`: Total sales from the WooCommerce store.
-- `sensor.total_orders`: Total number of orders.
-- `sensor.total_items`: Total number of items sold.
-- `sensor.total_tax`: Total tax collected.
-- `sensor.total_shipping`: Total shipping charges.
-- `sensor.total_customers`: Total number of customers.
+- `sensor.total_sales`: Today total sales from the WooCommerce store.
+- `sensor.total_orders`: Today total number of orders.
+- `sensor.total_items`: Today total number of items sold.
+- `sensor.total_tax`: Today total tax collected.
+- `sensor.total_shipping`: Today total shipping charges.
+- `sensor.total_customers`: Today total number of customers registered.
+- `sensor.orders_pending`: Total number of pending orders.
+- `orders_processing`: Total number of processing orders.
+- `orders_completed`: Total number of completed orders.
+- `orders_cancelled`: Total number of canceled orders.
+- `orders_refunded`: Total number of refunded orders.
+- `orders_failed`: Total number of failed orders.
 
 ---
 
@@ -72,6 +78,8 @@ entities:
     name: Total Shipping
   - entity: sensor.total_customers
     name: Total Customers
+  - entity: sensor.orders_processing
+    name: Processing Orders
 ```
 
 ### Chart (ApexCharts)
@@ -88,6 +96,8 @@ series:
     name: Total Orders
   - entity: sensor.total_items
     name: Items Sold
+  - entity: sensor.orders_processing
+    name: Processing Orders
 update_interval: 10min
 ```
 
