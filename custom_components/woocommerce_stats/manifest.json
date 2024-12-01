@@ -1,7 +1,7 @@
 {
   "domain": "woocommerce_stats",
   "name": "WooCommerce Stats",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "documentation": "https://github.com/techartdev/woocommerce_stats",
   "issue_tracker": "https://github.com/techartdev/woocommerce_stats/issues",
   "codeowners": ["@techartdev"],
