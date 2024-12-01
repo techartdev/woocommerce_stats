@@ -27,13 +27,18 @@ class WooCommerceStatsEntity(CoordinatorEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._config_entry = config_entry  # Store the config entry as an instance attribute
+        self._config_entry = config_entry
         self._attr_unique_id = f"{DOMAIN}_{description.key}_{config_entry.entry_id}"
 
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        return self.coordinator.data.get(self.entity_description.key)
+        key = self.entity_description.key
+        if key.startswith("orders_"):
+            # Fetch order totals by slug
+            slug = key.replace("orders_", "")
+            return self.coordinator.data["orders"].get(slug)
+        return self.coordinator.data["sales"].get(key)
 
     @property
     def extra_state_attributes(self):

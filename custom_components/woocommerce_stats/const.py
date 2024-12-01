@@ -60,4 +60,41 @@ SENSORS = [
         icon="mdi:account-group",
         native_unit_of_measurement="customers",
     ),
+    # Order totals by status
+    SensorEntityDescription(
+        key="orders_pending",
+        name="Orders Pending",
+        icon="mdi:clock-alert-outline",
+        native_unit_of_measurement="orders",
+    ),
+    SensorEntityDescription(
+        key="orders_processing",
+        name="Orders Processing",
+        icon="mdi:progress-clock",
+        native_unit_of_measurement="orders",
+    ),
+    SensorEntityDescription(
+        key="orders_completed",
+        name="Orders Completed",
+        icon="mdi:check-circle",
+        native_unit_of_measurement="orders",
+    ),
+    SensorEntityDescription(
+        key="orders_cancelled",
+        name="Orders Cancelled",
+        icon="mdi:cancel",
+        native_unit_of_measurement="orders",
+    ),
+    SensorEntityDescription(
+        key="orders_refunded",
+        name="Orders Refunded",
+        icon="mdi:cash-refund",
+        native_unit_of_measurement="orders",
+    ),
+    SensorEntityDescription(
+        key="orders_failed",
+        name="Orders Failed",
+        icon="mdi:alert-circle",
+        native_unit_of_measurement="orders",
+    ),
 ]

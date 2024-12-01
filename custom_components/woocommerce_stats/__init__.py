@@ -27,42 +27,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def async_update_data():
         """Fetch data from WooCommerce API."""
-        url = f"{config['url']}/wp-json/wc/v3/reports/sales"
+        sales_url = f"{config['url']}/wp-json/wc/v3/reports/sales"
+        orders_url = f"{config['url']}/wp-json/wc/v3/reports/orders/totals"
         auth = aiohttp.BasicAuth(config["consumer_key"], config["consumer_secret"])
 
         async with async_timeout.timeout(30):
             try:
-                async with session.get(url, auth=auth) as response:
-                    if response.status == 401:
-                        _LOGGER.error("Invalid WooCommerce API credentials.")
-                        raise UpdateFailed("Invalid API credentials.")
-                    if response.status != 200:
-                        _LOGGER.error(
-                            "Failed to fetch data from WooCommerce API. HTTP Status: %s",
-                            response.status,
-                        )
-                        raise UpdateFailed(f"HTTP Error: {response.status}")
+                async with session.get(sales_url, auth=auth) as sales_response:
+                    if sales_response.status != 200:
+                        raise UpdateFailed(f"Failed to fetch sales data. HTTP Status: {sales_response.status}")
+                    sales_data = await sales_response.json(content_type=None)
+                    if not isinstance(sales_data, list) or not sales_data:
+                        raise UpdateFailed("Unexpected sales data format from WooCommerce API.")
+                    sales_data = sales_data[0]  # Extract the first element
 
-                    # Parse JSON response
-                    result = await response.json(content_type=None)  # Avoid content type enforcement
-                    if not isinstance(result, list) or not result:
-                        _LOGGER.error("Unexpected response format: %s", result)
-                        raise UpdateFailed("Unexpected response format from WooCommerce API.")
+                async with session.get(orders_url, auth=auth) as orders_response:
+                    if orders_response.status != 200:
+                        raise UpdateFailed(f"Failed to fetch orders data. HTTP Status: {orders_response.status}")
+                    orders_data = await orders_response.json(content_type=None)
+                    if not isinstance(orders_data, list):
+                        raise UpdateFailed("Unexpected orders data format from WooCommerce API.")
 
-                    # Extract the first element of the list
-                    data = result[0]
-                    _LOGGER.debug("WooCommerce API parsed response: %s", data)
+                # Combine data from both reports
+                combined_data = {
+                    "sales": sales_data,
+                    "orders": {item["slug"]: item["total"] for item in orders_data},
+                }
+                _LOGGER.debug("Combined WooCommerce API response: %s", combined_data)
 
-                    # Save to persistent storage
-                    await store.async_save(data)
+                # Save combined data to persistent storage
+                await store.async_save(combined_data)
 
-                    return data
+                return combined_data
             except aiohttp.ClientError as e:
                 _LOGGER.error("Error communicating with WooCommerce API: %s", e)
                 raise UpdateFailed(f"Error communicating with WooCommerce API: {e}") from e
-            except ValueError as e:
-                _LOGGER.error("Invalid JSON response from WooCommerce API: %s", e)
-                raise UpdateFailed("Invalid JSON response from WooCommerce API.") from e
+
 
 
     # Data update coordinator for periodic fetching
